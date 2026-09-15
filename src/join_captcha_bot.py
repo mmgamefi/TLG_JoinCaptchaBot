@@ -719,9 +719,9 @@ async def allowed_in_this_group(bot, chat, member_added_by):
         logger.info(
             "%s, %s, %s, %s",
             chat.id, from_user_name, chat.title, chat_link)
-        msg_text = CONST["NOT_ALLOW_GROUP"].format(
-            CONST["BOT_OWNER"], chat.id, CONST["REPOSITORY"])
-        await tlg_send_msg(bot, chat.id, msg_text)
+        #msg_text = CONST["NOT_ALLOW_GROUP"].format(
+        #    CONST["BOT_OWNER"], chat.id, CONST["REPOSITORY"])
+        #await tlg_send_msg(bot, chat.id, msg_text)
         return False
     if is_group_in_banned_list(chat.id):
         logger.warning("[%d] Bot added to banned group", chat.id)
