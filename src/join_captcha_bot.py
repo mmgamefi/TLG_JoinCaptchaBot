@@ -1014,13 +1014,13 @@ async def captcha_fail_member_kick(bot, chat_id, user_id, user_name):
         Global.new_users[chat_id][user_id]["join_data"]["kicked_ban"] = True
         Global.new_users[chat_id][user_id]["join_data"]["join_retries"] = \
             join_retries
-        # Delete user join info if ban was success
-        if banned:
-            del Global.new_users[chat_id][user_id]
     except KeyError:
         logger.warning(
             "[%s] %s (%d) not in new_users list (already solve captcha)",
             chat_id, user_name, user_id)
+    # Return if the user was banned (the caller is in charge of removing
+    # the user messages and deleting the user info after cleanup)
+    return banned
 
 
 async def captcha_fail_member(bot, chat_id, user_id):
@@ -1033,12 +1033,14 @@ async def captcha_fail_member(bot, chat_id, user_id):
         user_name = \
             Global.new_users[chat_id][user_id]["join_data"]["user_name"]
     restriction = get_chat_config(chat_id, "Fail_Restriction")
+    banned = False
     if restriction == CMD["RESTRICTION"]["MUTE"]:
         await captcha_fail_member_mute(bot, chat_id, user_id, user_name)
     elif restriction == CMD["RESTRICTION"]["MEDIA"]:
         await captcha_fail_member_no_media(bot, chat_id, user_id, user_name)
     else:  # restriction == CMD["RESTRICTION"]["KICK"]
-        await captcha_fail_member_kick(bot, chat_id, user_id, user_name)
+        banned = \
+            await captcha_fail_member_kick(bot, chat_id, user_id, user_name)
     # Remove join messages
     try:
         logger.info("[%s] Removing msgs from user %s...", chat_id, user_name)
@@ -1048,7 +1050,7 @@ async def captcha_fail_member(bot, chat_id, user_id):
         for msg in Global.new_users[chat_id][user_id]["msg_to_rm"]:
             await delete_msg(bot, chat_id, msg)
         list_new_user_msg_to_rm_clear(chat_id, user_id)
-        if restriction != CMD["RESTRICTION"]["KICK"]:
+        if (restriction != CMD["RESTRICTION"]["KICK"]) or banned:
             del Global.new_users[chat_id][user_id]
     except KeyError:
         logger.warning(
