@@ -1,7 +1,7 @@
 # This Dockerfile has buildkit syntax, to allow build steps to be cached
 # and speed up when rebuilding
 
-FROM python:3.8.8-slim-buster AS base
+FROM python:3.12-slim-bookworm AS base
 
 # Build ARGs
 ARG BOT_PROJECT="captcha-bot"
@@ -34,7 +34,8 @@ RUN apt-get ${APT_OPTS} update && \
     apt-get ${APT_OPTS} install \
     build-essential \
     git \
-    procps  \
+    procps \
+    pkg-config \
     libtiff5-dev \
     libjpeg62-turbo-dev \
     zlib1g-dev \
@@ -43,7 +44,13 @@ RUN apt-get ${APT_OPTS} update && \
     libwebp-dev \
     tcl8.6-dev \
     tk8.6-dev \
-    python3-tk
+    python3-tk \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-dev \
+    shared-mime-info \
+	ffmpeg
 
 ################################################################################
 
@@ -52,7 +59,7 @@ FROM builder-deps AS builder
 # Build the code as unprivileged user
 USER ${BOT_USER}
 WORKDIR ${BOT_HOME_DIR}
-RUN git clone ${GITHUB_URL} ${APP_DIR} && \
+RUN git clone --branch main --depth 1 ${GITHUB_URL} ${APP_DIR} && \
     python3 -m pip install --user --requirement ${APP_DIR}/requirements.txt && \
     cd ${APP_DIR}/src && \
     chown -cR ${BOT_USER}:${BOT_GROUP} ${BOT_HOME_DIR} && \
@@ -63,11 +70,27 @@ RUN git clone ${GITHUB_URL} ${APP_DIR} && \
 
 FROM base AS app
 
+# ★★★ Key point: Install the runtime libraries in the final runtime image. ★★★
+RUN apt-get ${APT_OPTS} update && \
+    apt-get ${APT_OPTS} install \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libpangoft2-1.0-0 \
+    libgdk-pixbuf2.0-0 \
+    shared-mime-info \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Address the pip warning regarding PATH
 ENV PATH="${PATH}:${BOT_HOME_DIR}/.local/bin"
 
 # Import built code from previous step
 COPY --from=builder ${BOT_HOME_DIR} ${BOT_HOME_DIR}
+
+# Add execute permissions to the entry script and utility scripts.
+RUN chmod +x ${APP_DIR}/tools/entrypoint.sh \
+             ${APP_DIR}/tools/* 2>/dev/null || true
 
 # Adjust privileges
 RUN chown -R "${BOT_USER}:${BOT_GROUP}" ${BOT_HOME_DIR} && \
